@@ -9,31 +9,8 @@
 /*
   This example program echo client(TCP).
 */
-#include <string.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <errno.h>
-#include <netinet/in.h>
-#include <signal.h>
+#include "socket_common.h"
 
-
-
-/**
-* ∫Í∂®“Â
-**/
-#define MAX_BUF_SIZE                128
-#define LOCAL_IP_ADDR               127.0.0.1
-#define LOCAL_PORT                  5099
-#define LISTENQ                     10
-
-
-#define ECHO_EXPRE_RETURN(expr, retval)     \
-    do{ \
-    if(!(expr)){ return retval; } \
-    }while(0)   \
 
 /**
 *@brief:signal(SIGCHLD) handle func
@@ -130,7 +107,7 @@ int main(int argc, char *argv[])
     memset(&stServaddr, 0, sizeof(stServaddr));
 
     stServaddr.sin_family = AF_INET;
-    stServaddr.sin_port = htons(LOCAL_PORT);
+    stServaddr.sin_port = htons(LISTEN_PORT);
     stServaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     bind(iListenfd, (struct sockaddr *)&stServaddr, sizeof(stServaddr));

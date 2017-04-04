@@ -9,27 +9,7 @@
 /*
   This example program echo client(TCP).
 */
-#include <string.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <errno.h>
-#include <netinet/in.h>
-
-
-/**
-* ∫Í∂®“Â
-**/
-#define MAX_BUF_SIZE                128
-#define REMOTE_IP_ADDR              127.0.0.1
-#define REMOTE_PORT                 5099
-
-
-#define ECHO_EXPRE_RETURN(expr, retval)     \
-    do{ \
-    if(!(expr)){ return retval; } \
-    }while(0)   \
+#include "socket_common.h"
 
 
 /********************************************************
@@ -141,7 +121,7 @@ int main(int argc, char *argv[])
     iStatus = getsockname(iSockfd, (struct sockaddr *)&stLocaladdr, &len);
     if(0 == iStatus)
     {
-        printf("local addr:%s, port:%d", 
+        printf("local addr:%s, port:%d\n", 
                 inet_ntoa(stLocaladdr.sin_addr.s_addr), 
                 ntohs(stLocaladdr.sin_port));
     }
