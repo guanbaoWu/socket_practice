@@ -9,6 +9,7 @@
 /*
   This example program echo client(TCP) by select.
 */
+#include <poll.h>
 #include "socket_common.h"
 
 
@@ -23,20 +24,18 @@ int main(int argc, char *argv[])
 {
     int         i                           = 0;
     int         n                           = 0;
+    int         iMaxIndex                   = 0;
+    int         inReady                     = 0;
     int         iListenfd                   = 0;
     int         iAcceptfd                   = 0;
     int         iSocket                     = 0;
-    int         iMaxIndex                   = -1;
-    int         iMaxFd                      = 0;
-    int         iclient[MAX_FD_SIZE]        = {0};
     char        acRecvBuf[MAX_BUF_SIZE]     = {0};
-    int         inReady                     = 0;
     socklen_t   len                         = 0;
     struct sockaddr_in  stServaddr;
     struct sockaddr_in  stClientaddr;
-    fd_set readfds, allsets;
-    
-   
+
+    struct pollfd stClientArry[MAX_FD_SIZE];
+
     /**
     * 创建socket
     **/
@@ -61,88 +60,77 @@ int main(int argc, char *argv[])
     listen(iListenfd, LISTENQ);
 
     /**
-    * 初始化fd数组
+    * 初始化poll结构体数组
     **/
-    memset(iclient, -1, MAX_FD_SIZE);
-
-    iMaxFd = iListenfd;
-
+    for(i = 1; i < MAX_FD_SIZE; i++)
+    {
+        stClientArry[i].fd = -1;
+    }
 
     /**
-    * 初始化描述符集
+    * 置第一个事件
     **/
-    FD_ZERO(&allsets);
-    FD_SET(iListenfd, &allsets);
-    
+    stClientArry[0].fd = iListenfd;
+    stClientArry[0].events = POLLRDNORM;
+
     while(1)
     {
+        inReady = poll(stClientArry, iMaxIndex + 1, -1);
 
-        /**
-        *每次调用select前初始化描述符集
-        **/
-        readfds = allsets;
-
-        printf("iMaxFd:%d\n", iMaxFd);
-        
-        inReady = select(iMaxFd+1, &readfds, NULL, NULL, NULL);
-
-        printf("recv events:%d\n", inReady);
-
-        if(FD_ISSET(iListenfd, &readfds))
+        if(stClientArry[0].revents & POLLRDNORM)
         {
             memset(&stClientaddr, 0, sizeof(stClientaddr));
             len = sizeof(stClientaddr);
+            
             iAcceptfd = accept(iListenfd, (struct sockaddr *)&stClientaddr, &len);
 
-            printf("recv new client accept:%d\n", iAcceptfd);
-            
             /**
-            * 新的描述符加入描述符集
+            * 保存连接的套接字
             **/
-            for(i = 0; i < MAX_FD_SIZE; i++)
+            for(i = 1; i < MAX_FD_SIZE; i++)
             {
-                if(iclient[i] == -1)
+                if(stClientArry[i].fd == -1)
                 {
-                    iclient[i] = iAcceptfd;
+                    stClientArry[i].fd = iAcceptfd;
+                    stClientArry[i].events = POLLRDNORM;
                     break;
                 }
             }
 
             if(i == MAX_FD_SIZE)
             {
-                printf("too many clients\n");
+                printf("too many connect\n");
                 return -1;
             }
 
-            FD_SET(iAcceptfd, &allsets);
-
-            iMaxFd = iMaxFd < iAcceptfd ? iAcceptfd : iMaxFd;
-            iMaxIndex = i >= iMaxIndex ? i : iMaxIndex;
-
+            iMaxIndex = i >= iMaxIndex ? i :iMaxIndex;
+            
             if(--inReady <= 0)
                 continue;
-                
         }
 
-        for(i = 0; i <= iMaxIndex; i++)
+        for(i = 1; i <= iMaxIndex; i++)
         {
-            printf("recv iSockets:%d\n", iclient[i]);
-            
-            if(iclient[i] >= 0 && FD_ISSET(iclient[i], &readfds))
+            if((stClientArry[i].fd >=0) && (stClientArry[i].revents & (POLLRDNORM | POLLERR)))
             {
-                
-                iSocket = iclient[i];
-                memset(acRecvBuf, 0, MAX_BUF_SIZE);
-
-                /**
-                * 收对端FIN,从描述符集中删除此描述符
-                **/
-                if((n = read(iSocket, acRecvBuf, MAX_BUF_SIZE)) == 0)
+                iSocket = stClientArry[i].fd;
+                if((n = read(iSocket, acRecvBuf, MAX_BUF_SIZE)) < 0)
                 {
-                     printf("remote terminal!!\n");
-                     close(iSocket);
-                     FD_CLR(iSocket, &allsets);
-                     iclient[i] = -1;
+                    if(errno == ECONNRESET)
+                    {
+                        close(iSocket);
+                        stClientArry[i].fd = -1;              
+                    }
+                    else
+                    {
+                        printf("read error\n");
+                        return -1;
+                    }
+                }
+                else if(n == 0)
+                {
+                    close(iSocket);
+                    stClientArry[i].fd = -1;  
                 }
                 else
                 {
@@ -153,11 +141,9 @@ int main(int argc, char *argv[])
                 if(--inReady <= 0)
                     break;
             }
-            
         }
-
     }
-
+    
 }
 
 
